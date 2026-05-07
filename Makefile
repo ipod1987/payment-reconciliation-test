@@ -14,16 +14,17 @@ help: ## Muestra esta ayuda
 build: ## Construye la imagen de la aplicación
 	$(COMPOSE) build --no-cache $(APP)
 
-up: ## Levanta todos los servicios (postgres + wiremock + app)
+up: ## Levanta todos los servicios (postgres + wiremock-json + wiremock-soap + app)
 	$(COMPOSE) up -d
 	@echo ""
-	@echo "  API:     http://localhost:8080/api/v1/reconciliation/{paymentId}"
-	@echo "  Swagger: http://localhost:8080/api/swagger-ui.html"
-	@echo "  WireMock http://localhost:9090/__admin/mappings"
+	@echo "  API:              http://localhost:8080/api/v1/reconciliation/{paymentId}"
+	@echo "  Swagger:          http://localhost:8080/api/swagger-ui.html"
+	@echo "  WireMock JSON:    http://localhost:9091/__admin/mappings"
+	@echo "  WireMock SOAP:    http://localhost:9092/__admin/mappings"
 	@echo ""
 
-up-db: ## Levanta solo postgres y wiremock (útil para desarrollar localmente sin Docker app)
-	$(COMPOSE) up -d postgres wiremock
+up-db: ## Levanta postgres + ambos WireMock (útil para desarrollar localmente sin Docker app)
+	$(COMPOSE) up -d postgres wiremock-json wiremock-soap
 
 down: ## Para y elimina los contenedores (los volúmenes persisten)
 	$(COMPOSE) down

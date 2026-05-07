@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@Schema(description = "Resultado completo de la conciliación de un pago")
+@Schema(description = "Resultado completo de la conciliación de un pago entre tres fuentes")
 public record ReconciliationResponseDto(
 
     @Schema(description = "ID del pago conciliado", example = "pay_abc123")
@@ -18,7 +18,8 @@ public record ReconciliationResponseDto(
         example = "CONCILIATED",
         allowableValues = {
             "CONCILIATED", "DISCREPANCY_AMOUNT", "DISCREPANCY_DATE",
-            "MULTIPLE_DISCREPANCIES", "MISSING_IN_INTERNAL", "MISSING_IN_PROCESSOR"
+            "MULTIPLE_DISCREPANCIES", "MISSING_IN_INTERNAL", "MISSING_IN_PROCESSOR",
+            "MISSING_IN_JSON_PROCESSOR", "MISSING_IN_SOAP_PROCESSOR"
         }
     )
     String status,
@@ -35,8 +36,11 @@ public record ReconciliationResponseDto(
     @Schema(description = "Datos del pago en el sistema interno (null si no existe)")
     PaymentSummaryDto internalPayment,
 
-    @Schema(description = "Datos del pago en el procesador externo (null si no existe)")
+    @Schema(description = "Datos del pago en el procesador JSON/REST externo (null si no existe)")
     PaymentSummaryDto processorPayment,
+
+    @Schema(description = "Datos del pago en el procesador SOAP externo (null si no existe)")
+    PaymentSummaryDto soapProcessorPayment,
 
     @Schema(description = "Timestamp en que se realizó la conciliación")
     LocalDateTime reconciledAt

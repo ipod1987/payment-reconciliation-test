@@ -18,41 +18,75 @@ public class ReconciliationResult {
     List<Discrepancy> discrepancies;
     Payment internalPayment;
     Payment processorPayment;
+    Payment soapProcessorPayment;
     LocalDateTime reconciledAt;
 
     public Optional<Payment> getInternalPayment() {
         return Optional.ofNullable(internalPayment);
     }
 
+    /** JSON processor snapshot. */
     public Optional<Payment> getProcessorPayment() {
         return Optional.ofNullable(processorPayment);
+    }
+
+    /** SOAP processor snapshot. */
+    public Optional<Payment> getSoapProcessorPayment() {
+        return Optional.ofNullable(soapProcessorPayment);
     }
 
     public boolean hasDiscrepancies() {
         return discrepancies != null && !discrepancies.isEmpty();
     }
 
-    /**
-     * Factory: resultado para pago completamente conciliado (sin discrepancias).
-     */
+    // ── 3-source factory methods ──────────────────────────────────────────────
+
     public static ReconciliationResult conciliated(
         PaymentId paymentId,
         Payment internalPayment,
-        Payment processorPayment
+        Payment jsonProcessorPayment,
+        Payment soapProcessorPayment
     ) {
         return ReconciliationResult.builder()
             .paymentId(paymentId)
             .status(ReconciliationStatus.CONCILIATED)
             .discrepancies(List.of())
             .internalPayment(internalPayment)
-            .processorPayment(processorPayment)
+            .processorPayment(jsonProcessorPayment)
+            .soapProcessorPayment(soapProcessorPayment)
             .reconciledAt(LocalDateTime.now())
             .build();
     }
 
-    /**
-     * Factory: resultado con discrepancias detectadas.
-     */
+    public static ReconciliationResult withDiscrepancies(
+        PaymentId paymentId,
+        ReconciliationStatus status,
+        List<Discrepancy> discrepancies,
+        Payment internalPayment,
+        Payment jsonProcessorPayment,
+        Payment soapProcessorPayment
+    ) {
+        return ReconciliationResult.builder()
+            .paymentId(paymentId)
+            .status(status)
+            .discrepancies(discrepancies)
+            .internalPayment(internalPayment)
+            .processorPayment(jsonProcessorPayment)
+            .soapProcessorPayment(soapProcessorPayment)
+            .reconciledAt(LocalDateTime.now())
+            .build();
+    }
+
+    // ── 2-source factory methods (backward-compat for tests/existing code) ───
+
+    public static ReconciliationResult conciliated(
+        PaymentId paymentId,
+        Payment internalPayment,
+        Payment processorPayment
+    ) {
+        return conciliated(paymentId, internalPayment, processorPayment, null);
+    }
+
     public static ReconciliationResult withDiscrepancies(
         PaymentId paymentId,
         ReconciliationStatus status,
@@ -60,13 +94,6 @@ public class ReconciliationResult {
         Payment internalPayment,
         Payment processorPayment
     ) {
-        return ReconciliationResult.builder()
-            .paymentId(paymentId)
-            .status(status)
-            .discrepancies(discrepancies)
-            .internalPayment(internalPayment)
-            .processorPayment(processorPayment)
-            .reconciledAt(LocalDateTime.now())
-            .build();
+        return withDiscrepancies(paymentId, status, discrepancies, internalPayment, processorPayment, null);
     }
 }

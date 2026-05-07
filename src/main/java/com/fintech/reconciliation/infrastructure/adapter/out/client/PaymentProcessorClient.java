@@ -10,6 +10,7 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -20,38 +21,42 @@ import java.util.Optional;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class PaymentProcessorClient implements LoadProcessorPaymentPort {
 
     private final WebClient processorWebClient;
     private final ProcessorAuthService authService;
 
+    public PaymentProcessorClient(
+        @Qualifier("processorWebClient") WebClient processorWebClient,
+        ProcessorAuthService authService
+    ) {
+        this.processorWebClient = processorWebClient;
+        this.authService = authService;
+    }
+
     @Override
     @CircuitBreaker(name = "paymentProcessor", fallbackMethod = "processorUnavailableFallback")
     @Retry(name = "paymentProcessor")
     public Optional<Payment> findProcessorPaymentById(String paymentId) {
-        log.debug("Fetching payment from processor: paymentId={}", paymentId);
+        log.debug("Fetching payment from JSON processor: paymentId={}", paymentId);
 
         try {
             ProcessorPaymentDto dto = processorWebClient.get()
                 .uri("/payments/{id}", paymentId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + authService.getValidToken())
                 .retrieve()
-                .onStatus(HttpStatusCode::is4xxClientError, response ->
-                    response.createException().map(ex -> ex)
-                )
+                .onStatus(HttpStatusCode::is4xxClientError, response -> response.createException().map(ex -> ex))
                 .bodyToMono(ProcessorPaymentDto.class)
                 .block();
 
             return Optional.ofNullable(dto).map(this::toDomain);
 
         } catch (WebClientResponseException.NotFound e) {
-            log.info("Payment not found in processor: paymentId={}", paymentId);
+            log.info("Payment not found in JSON processor: paymentId={}", paymentId);
             return Optional.empty();
 
         } catch (WebClientResponseException.Unauthorized e) {
-            // Token may have expired server-side; invalidate so the next retry fetches a fresh one
-            log.warn("Received 401 from processor, invalidating cached token: paymentId={}", paymentId);
+            log.warn("Received 401 from JSON processor, invalidating cached token: paymentId={}", paymentId);
             authService.invalidateToken();
             throw e;
         }
@@ -59,9 +64,9 @@ public class PaymentProcessorClient implements LoadProcessorPaymentPort {
 
     @SuppressWarnings("unused")
     public Optional<Payment> processorUnavailableFallback(String paymentId, Exception ex) {
-        log.error("Circuit breaker open for processor, paymentId={}: {}", paymentId, ex.getMessage());
+        log.error("Circuit breaker open for JSON processor, paymentId={}: {}", paymentId, ex.getMessage());
         throw new ProcessorUnavailableException(
-            "Payment processor is currently unavailable for paymentId: " + paymentId, ex
+            "JSON payment processor is currently unavailable for paymentId: " + paymentId, ex
         );
     }
 

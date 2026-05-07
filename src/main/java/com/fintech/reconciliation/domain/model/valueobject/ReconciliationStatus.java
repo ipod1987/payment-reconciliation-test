@@ -2,35 +2,21 @@ package com.fintech.reconciliation.domain.model.valueobject;
 
 public enum ReconciliationStatus {
 
-    /**
-     * El pago existe en ambos sistemas con datos idénticos.
-     */
-    CONCILIATED("Payment matches across both systems"),
+    CONCILIATED("Payment matches across all three systems"),
 
-    /**
-     * El monto difiere entre el sistema interno y el procesador.
-     */
-    DISCREPANCY_AMOUNT("Amount mismatch between internal and processor"),
+    DISCREPANCY_AMOUNT("Amount mismatch detected between sources"),
 
-    /**
-     * La fecha/hora de la transacción difiere entre fuentes.
-     */
-    DISCREPANCY_DATE("Transaction date mismatch between internal and processor"),
+    DISCREPANCY_DATE("Transaction date mismatch detected between sources"),
 
-    /**
-     * Existen múltiples campos con discrepancia simultánea.
-     */
-    MULTIPLE_DISCREPANCIES("Multiple fields mismatch between internal and processor"),
+    MULTIPLE_DISCREPANCIES("Multiple fields mismatch between sources"),
 
-    /**
-     * El pago existe en el procesador externo pero no en el sistema interno.
-     */
-    MISSING_IN_INTERNAL("Payment found in processor but missing in internal system"),
+    MISSING_IN_INTERNAL("Payment found in processor(s) but missing in internal system"),
 
-    /**
-     * El pago existe en el sistema interno pero no fue recibido por el procesador.
-     */
-    MISSING_IN_PROCESSOR("Payment found in internal system but missing in processor");
+    MISSING_IN_PROCESSOR("Payment found in internal system but missing in all external processors"),
+
+    MISSING_IN_JSON_PROCESSOR("Payment found in internal and SOAP processor but missing in JSON processor"),
+
+    MISSING_IN_SOAP_PROCESSOR("Payment found in internal and JSON processor but missing in SOAP processor");
 
     private final String description;
 

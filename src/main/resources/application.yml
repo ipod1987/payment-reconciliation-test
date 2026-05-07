@@ -23,16 +23,15 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
         default_schema: public
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
 
-# External Payment Processor
+# JSON/REST External Payment Processor
 payment-processor:
-  base-url: ${PROCESSOR_BASE_URL:https://api.payment-processor.com}
+  base-url: ${PROCESSOR_BASE_URL:http://localhost:9091}
   timeout-ms: 5000
   auth:
     url: /auth/token
@@ -40,7 +39,19 @@ payment-processor:
     password: ${PROCESSOR_PASSWORD:secret-2024}
     channel: ${PROCESSOR_CHANNEL:API}
 
-# Resilience4j - Circuit Breaker para el cliente externo
+# SOAP External Payment Processor (legacy XML)
+soap-processor:
+  base-url: ${SOAP_PROCESSOR_URL:http://localhost:9092}
+  api-key: ${SOAP_API_KEY:soap-api-key-dev-2024}
+  timeout-ms: 5000
+
+# JWT — stateless API security
+security:
+  jwt:
+    secret: ${JWT_SECRET:dGVzdC1qd3Qtc2VjcmV0LWtleS1mb3ItcGF5bWVudC1yZWNvbmNpbGlhdGlvbi0yMDI0}
+    expiration-ms: ${JWT_EXPIRATION_MS:3600000}
+
+# Resilience4j
 resilience4j:
   circuitbreaker:
     instances:
@@ -55,9 +66,25 @@ resilience4j:
         record-exceptions:
           - java.io.IOException
           - java.util.concurrent.TimeoutException
+      soapProcessor:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 30s
+        failure-rate-threshold: 50
+        record-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.reactive.function.client.WebClientRequestException
   retry:
     instances:
       paymentProcessor:
+        max-attempts: 3
+        wait-duration: 500ms
+        exponential-backoff-multiplier: 2
+      soapProcessor:
         max-attempts: 3
         wait-duration: 500ms
         exponential-backoff-multiplier: 2
@@ -71,8 +98,8 @@ springdoc:
     operations-sorter: method
   info:
     title: Payment Reconciliation API
-    description: API para conciliación de pagos entre sistema interno y procesador externo
-    version: 1.0.0
+    description: API para conciliación de pagos entre sistema interno, procesador JSON y procesador SOAP
+    version: 2.0.0
 
 # Actuator
 management:
@@ -87,4 +114,3 @@ management:
 logging:
   level:
     com.fintech.reconciliation: INFO
-    org.hibernate.SQL: DEBUG

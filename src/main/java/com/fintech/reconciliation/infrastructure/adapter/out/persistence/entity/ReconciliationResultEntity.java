@@ -39,15 +39,19 @@ public class ReconciliationResultEntity {
     @Enumerated(EnumType.STRING)
     private ReconciliationStatusJpa status;
 
-    // Snapshot del pago interno al momento de la conciliación (JSONB para flexibilidad)
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "internal_payment_snapshot", columnDefinition = "jsonb")
     private PaymentSnapshot internalPayment;
 
-    // Snapshot del pago del procesador al momento de la conciliación
+    /** JSON (REST) processor snapshot. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "processor_payment_snapshot", columnDefinition = "jsonb")
     private PaymentSnapshot processorPayment;
+
+    /** SOAP processor snapshot — added in V3 migration. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "soap_processor_payment_snapshot", columnDefinition = "jsonb")
+    private PaymentSnapshot soapProcessorPayment;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "discrepancies", columnDefinition = "jsonb")
@@ -64,7 +68,6 @@ public class ReconciliationResultEntity {
         this.createdAt = LocalDateTime.now();
     }
 
-    // Value objects embebidos como JSON para evitar joins costosos en auditoría
     public record PaymentSnapshot(
         String paymentId,
         String amount,
@@ -78,11 +81,13 @@ public class ReconciliationResultEntity {
         String type,
         String field,
         String internalValue,
-        String processorValue
+        String processorValue,
+        String processorSource     // nullable — null in data written before V3
     ) {}
 
     public enum ReconciliationStatusJpa {
         CONCILIATED, DISCREPANCY_AMOUNT, DISCREPANCY_DATE,
-        MULTIPLE_DISCREPANCIES, MISSING_IN_INTERNAL, MISSING_IN_PROCESSOR
+        MULTIPLE_DISCREPANCIES, MISSING_IN_INTERNAL, MISSING_IN_PROCESSOR,
+        MISSING_IN_JSON_PROCESSOR, MISSING_IN_SOAP_PROCESSOR
     }
 }

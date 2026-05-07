@@ -19,7 +19,7 @@ public class Payment {
     PaymentSource source;
 
     public enum PaymentSource {
-        INTERNAL, PROCESSOR
+        INTERNAL, PROCESSOR, SOAP_PROCESSOR
     }
 
     public boolean hasTransactionDateWithin(Payment other, long toleranceMinutes) {

@@ -1,0 +1,143 @@
+{
+  "mappings": [
+
+    {
+      "name": "SOAP - missing X-Api-Key -> 401",
+      "priority": 10,
+      "request": {
+        "method": "POST",
+        "urlPattern": "/soap/PaymentService",
+        "headers": { "X-Api-Key": { "absent": true } }
+      },
+      "response": {
+        "status": 401,
+        "headers": { "Content-Type": "text/xml;charset=UTF-8" },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>Missing X-Api-Key header</faultstring></soap:Fault></soap:Body></soap:Envelope>"
+      }
+    },
+
+    {
+      "name": "SOAP - pay_abc123 CONCILIATED",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "url": "/soap/PaymentService",
+        "headers": { "X-Api-Key": { "equalTo": "soap-api-key-dev-2024" } },
+        "bodyPatterns": [
+          { "matchesXPath": "//*[local-name()='paymentId'][text()='pay_abc123']" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/xml;charset=UTF-8" },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><GetPaymentResponse><paymentId>pay_abc123</paymentId><amount>100.00</amount><currency>USD</currency><status>APPROVED</status><description>E-commerce purchase - Nike Store</description><processedAt>2024-06-15T10:01:00</processedAt></GetPaymentResponse></soap:Body></soap:Envelope>"
+      }
+    },
+
+    {
+      "name": "SOAP - pay_disc001 DISCREPANCY_AMOUNT (processor 95.00)",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "url": "/soap/PaymentService",
+        "headers": { "X-Api-Key": { "equalTo": "soap-api-key-dev-2024" } },
+        "bodyPatterns": [
+          { "matchesXPath": "//*[local-name()='paymentId'][text()='pay_disc001']" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/xml;charset=UTF-8" },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><GetPaymentResponse><paymentId>pay_disc001</paymentId><amount>95.00</amount><currency>USD</currency><status>APPROVED</status><description>Subscription - Spotify Premium</description><processedAt>2024-06-15T11:00:30</processedAt></GetPaymentResponse></soap:Body></soap:Envelope>"
+      }
+    },
+
+    {
+      "name": "SOAP - pay_date001 DISCREPANCY_DATE (processor +2h)",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "url": "/soap/PaymentService",
+        "headers": { "X-Api-Key": { "equalTo": "soap-api-key-dev-2024" } },
+        "bodyPatterns": [
+          { "matchesXPath": "//*[local-name()='paymentId'][text()='pay_date001']" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/xml;charset=UTF-8" },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><GetPaymentResponse><paymentId>pay_date001</paymentId><amount>75.50</amount><currency>EUR</currency><status>APPROVED</status><description>Hotel booking - Marriott</description><processedAt>2024-06-15T11:00:00</processedAt></GetPaymentResponse></soap:Body></soap:Envelope>"
+      }
+    },
+
+    {
+      "name": "SOAP - pay_multi001 MULTIPLE_DISCREPANCIES",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "url": "/soap/PaymentService",
+        "headers": { "X-Api-Key": { "equalTo": "soap-api-key-dev-2024" } },
+        "bodyPatterns": [
+          { "matchesXPath": "//*[local-name()='paymentId'][text()='pay_multi001']" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/xml;charset=UTF-8" },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><GetPaymentResponse><paymentId>pay_multi001</paymentId><amount>285.00</amount><currency>USD</currency><status>APPROVED</status><description>SaaS platform - Salesforce</description><processedAt>2024-06-20T12:30:00</processedAt></GetPaymentResponse></soap:Body></soap:Envelope>"
+      }
+    },
+
+    {
+      "name": "SOAP - pay_missing MISSING_IN_PROCESSOR (SOAP fault)",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "url": "/soap/PaymentService",
+        "headers": { "X-Api-Key": { "equalTo": "soap-api-key-dev-2024" } },
+        "bodyPatterns": [
+          { "matchesXPath": "//*[local-name()='paymentId'][text()='pay_missing']" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/xml;charset=UTF-8" },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>Payment pay_missing not found</faultstring></soap:Fault></soap:Body></soap:Envelope>"
+      }
+    },
+
+    {
+      "name": "SOAP - pay_extonly MISSING_IN_INTERNAL",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "url": "/soap/PaymentService",
+        "headers": { "X-Api-Key": { "equalTo": "soap-api-key-dev-2024" } },
+        "bodyPatterns": [
+          { "matchesXPath": "//*[local-name()='paymentId'][text()='pay_extonly']" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/xml;charset=UTF-8" },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><GetPaymentResponse><paymentId>pay_extonly</paymentId><amount>300.00</amount><currency>USD</currency><status>APPROVED</status><description>Refund - Amazon</description><processedAt>2024-06-15T14:00:00</processedAt></GetPaymentResponse></soap:Body></soap:Envelope>"
+      }
+    },
+
+    {
+      "name": "SOAP - catch-all valid key payment not found",
+      "priority": 5,
+      "request": {
+        "method": "POST",
+        "url": "/soap/PaymentService",
+        "headers": { "X-Api-Key": { "equalTo": "soap-api-key-dev-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "text/xml;charset=UTF-8" },
+        "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap:Envelope xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\"><soap:Body><soap:Fault><faultcode>soap:Client</faultcode><faultstring>Payment not found</faultstring></soap:Fault></soap:Body></soap:Envelope>"
+      }
+    }
+
+  ]
+}

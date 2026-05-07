@@ -21,12 +21,21 @@ val mapstructVersion = "1.5.5.Final"
 val resilience4jVersion = "2.2.0"
 val springdocVersion = "2.5.0"
 val testcontainersVersion = "1.19.8"
+val jjwtVersion = "0.12.6"
 
 dependencies {
     // Spring Boot Core
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+
+    // Security
+    implementation("org.springframework.boot:spring-boot-starter-security")
+
+    // JWT
+    implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:$jjwtVersion")
 
     // Persistence
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -35,6 +44,9 @@ dependencies {
 
     // HTTP Client (external processor calls)
     implementation("org.springframework.boot:spring-boot-starter-webflux")
+
+    // XML parsing (SOAP trama)
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
 
     // Resilience4j
     implementation("io.github.resilience4j:resilience4j-spring-boot3:$resilience4jVersion")
@@ -54,6 +66,7 @@ dependencies {
 
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("com.h2database:h2")
     testImplementation("org.testcontainers:junit-jupiter:$testcontainersVersion")
     testImplementation("org.testcontainers:postgresql:$testcontainersVersion")

@@ -4,6 +4,7 @@ import com.fintech.reconciliation.domain.exception.ProcessorUnavailableException
 import com.fintech.reconciliation.infrastructure.adapter.out.client.dto.ProcessorTokenRequestDto;
 import com.fintech.reconciliation.infrastructure.adapter.out.client.dto.ProcessorTokenResponseDto;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -31,7 +32,7 @@ public class ProcessorAuthService {
     private volatile String cachedToken;
     private volatile Instant tokenExpiry = Instant.MIN;
 
-    public ProcessorAuthService(WebClient processorWebClient) {
+    public ProcessorAuthService(@Qualifier("processorWebClient") WebClient processorWebClient) {
         this.webClient = processorWebClient;
     }
 
@@ -42,7 +43,6 @@ public class ProcessorAuthService {
         return cachedToken;
     }
 
-    // Called when the processor returns 401 so the next request fetches a fresh token
     public synchronized void invalidateToken() {
         cachedToken = null;
         tokenExpiry = Instant.MIN;
@@ -59,12 +59,11 @@ public class ProcessorAuthService {
             .block();
 
         if (response == null || response.accessToken() == null) {
-            throw new ProcessorUnavailableException("Failed to obtain auth token from processor", null);
+            throw new ProcessorUnavailableException("Failed to obtain auth token from JSON processor", null);
         }
 
         cachedToken = response.accessToken();
-        // refresh 60 s before actual expiry to avoid using a token that is about to expire
         tokenExpiry = Instant.now().plusSeconds(response.expiresIn() - 60);
-        log.info("Auth token refreshed, valid for ~{} seconds", response.expiresIn() - 60);
+        log.info("JSON processor auth token refreshed, valid for ~{} seconds", response.expiresIn() - 60);
     }
 }

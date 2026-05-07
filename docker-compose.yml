@@ -27,16 +27,31 @@ services:
       - reconciliation-net
 
   # ===========================================================================
-  # WireMock — stub del procesador externo de pagos (solo desarrollo)
+  # WireMock — JSON/REST processor stub (port 9091)
   # ===========================================================================
-  wiremock:
+  wiremock-json:
     image: wiremock/wiremock:3.6.0
-    container_name: reconciliation-wiremock
+    container_name: reconciliation-wiremock-json
     restart: unless-stopped
     ports:
-      - "9090:8080"
+      - "9091:8080"
     volumes:
-      - ./docker/wiremock/mappings:/home/wiremock/mappings:ro
+      - ./docker/wiremock-json/mappings:/home/wiremock/mappings:ro
+    command: [ "--verbose", "--global-response-templating" ]
+    networks:
+      - reconciliation-net
+
+  # ===========================================================================
+  # WireMock — SOAP processor stub (port 9092)
+  # ===========================================================================
+  wiremock-soap:
+    image: wiremock/wiremock:3.6.0
+    container_name: reconciliation-wiremock-soap
+    restart: unless-stopped
+    ports:
+      - "9092:8080"
+    volumes:
+      - ./docker/wiremock-soap/mappings:/home/wiremock/mappings:ro
     command: [ "--verbose", "--global-response-templating" ]
     networks:
       - reconciliation-net
@@ -56,8 +71,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5435/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      PROCESSOR_BASE_URL: ${PROCESSOR_BASE_URL}
-      PROCESSOR_API_KEY: ${PROCESSOR_API_KEY}
+      PROCESSOR_BASE_URL: http://wiremock-json:8080
+      SOAP_PROCESSOR_URL: http://wiremock-soap:8080
+      SOAP_API_KEY: ${SOAP_API_KEY:-soap-api-key-dev-2024}
       # Activa el perfil docker para logging y configuración específica
       SPRING_PROFILES_ACTIVE: docker
     ports:
@@ -65,7 +81,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      wiremock:
+      wiremock-json:
+        condition: service_started
+      wiremock-soap:
         condition: service_started
     networks:
       - reconciliation-net

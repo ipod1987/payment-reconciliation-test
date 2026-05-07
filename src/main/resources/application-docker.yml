@@ -5,6 +5,9 @@ spring:
   jpa:
     show-sql: false
 
+soap-processor:
+  base-url: http://wiremock:8080
+
 logging:
   level:
     com.fintech.reconciliation: INFO

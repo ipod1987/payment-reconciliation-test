@@ -20,20 +20,22 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface ReconciliationEntityMapper {
 
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    @Mapping(target = "paymentId", expression = "java(result.getPaymentId().value())")
-    @Mapping(target = "status", source = "status", qualifiedByName = "toJpaStatus")
-    @Mapping(target = "internalPayment", expression = "java(result.getInternalPayment().map(p -> toPaymentSnapshot(p)).orElse(null))")
-    @Mapping(target = "processorPayment", expression = "java(result.getProcessorPayment().map(p -> toPaymentSnapshot(p)).orElse(null))")
-    @Mapping(target = "discrepancies", source = "discrepancies", qualifiedByName = "toDiscrepancySnapshots")
+    @Mapping(target = "id",                   ignore = true)
+    @Mapping(target = "createdAt",            ignore = true)
+    @Mapping(target = "paymentId",            expression = "java(result.getPaymentId().value())")
+    @Mapping(target = "status",               source = "status", qualifiedByName = "toJpaStatus")
+    @Mapping(target = "internalPayment",      expression = "java(result.getInternalPayment().map(p -> toPaymentSnapshot(p)).orElse(null))")
+    @Mapping(target = "processorPayment",     expression = "java(result.getProcessorPayment().map(p -> toPaymentSnapshot(p)).orElse(null))")
+    @Mapping(target = "soapProcessorPayment", expression = "java(result.getSoapProcessorPayment().map(p -> toPaymentSnapshot(p)).orElse(null))")
+    @Mapping(target = "discrepancies",        source = "discrepancies", qualifiedByName = "toDiscrepancySnapshots")
     ReconciliationResultEntity toEntity(ReconciliationResult result);
 
-    @Mapping(target = "paymentId", expression = "java(com.fintech.reconciliation.domain.model.valueobject.PaymentId.of(entity.getPaymentId()))")
-    @Mapping(target = "status", source = "status", qualifiedByName = "toDomainStatus")
-    @Mapping(target = "internalPayment", source = "internalPayment", qualifiedByName = "toDomainPayment")
-    @Mapping(target = "processorPayment", source = "processorPayment", qualifiedByName = "toDomainPayment")
-    @Mapping(target = "discrepancies", source = "discrepancies", qualifiedByName = "toDomainDiscrepancies")
+    @Mapping(target = "paymentId",            expression = "java(com.fintech.reconciliation.domain.model.valueobject.PaymentId.of(entity.getPaymentId()))")
+    @Mapping(target = "status",               source = "status",               qualifiedByName = "toDomainStatus")
+    @Mapping(target = "internalPayment",      source = "internalPayment",      qualifiedByName = "toDomainPayment")
+    @Mapping(target = "processorPayment",     source = "processorPayment",     qualifiedByName = "toDomainPayment")
+    @Mapping(target = "soapProcessorPayment", source = "soapProcessorPayment", qualifiedByName = "toDomainPayment")
+    @Mapping(target = "discrepancies",        source = "discrepancies",        qualifiedByName = "toDomainDiscrepancies")
     ReconciliationResult toDomain(ReconciliationResultEntity entity);
 
     @Named("toJpaStatus")
@@ -79,7 +81,8 @@ public interface ReconciliationEntityMapper {
                 d.getType().name(),
                 d.getField(),
                 d.getInternalValue(),
-                d.getProcessorValue()
+                d.getProcessorValue(),
+                d.getProcessorSource()
             ))
             .toList();
     }
@@ -93,6 +96,7 @@ public interface ReconciliationEntityMapper {
                 .field(s.field())
                 .internalValue(s.internalValue())
                 .processorValue(s.processorValue())
+                .processorSource(s.processorSource())
                 .build()
             )
             .toList();

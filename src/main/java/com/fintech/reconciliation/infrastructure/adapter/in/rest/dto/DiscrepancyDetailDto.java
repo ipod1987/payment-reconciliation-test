@@ -17,5 +17,12 @@ public record DiscrepancyDetailDto(
     String internalValue,
 
     @Schema(description = "Valor registrado en el procesador externo", example = "99.50 USD")
-    String processorValue
+    String processorValue,
+
+    @Schema(
+        description = "Fuente externa donde se detectó la discrepancia",
+        example = "JSON_PROCESSOR",
+        allowableValues = {"JSON_PROCESSOR", "SOAP_PROCESSOR"}
+    )
+    String processorSource
 ) {}
