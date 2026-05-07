@@ -13,9 +13,11 @@ import java.util.UUID;
 @Table(
     name = "reconciliation_results",
     indexes = {
-        @Index(name = "idx_reconciliation_payment_id", columnList = "payment_id"),
-        @Index(name = "idx_reconciliation_status", columnList = "status"),
-        @Index(name = "idx_reconciliation_reconciled_at", columnList = "reconciled_at")
+        @Index(name = "idx_reconciliation_payment_id",          columnList = "payment_id"),
+        @Index(name = "idx_reconciliation_status",              columnList = "status"),
+        @Index(name = "idx_reconciliation_reconciled_at",       columnList = "reconciled_at DESC"),
+        @Index(name = "idx_reconciliation_pid_reconciled_at",   columnList = "payment_id, reconciled_at DESC"),
+        @Index(name = "idx_reconciliation_reconciled_at_pid",   columnList = "reconciled_at DESC, payment_id")
     }
 )
 @Getter

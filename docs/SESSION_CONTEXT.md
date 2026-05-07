@@ -247,5 +247,5 @@ open http://localhost:8080/api/swagger-ui.html
 - [ ] Agregar `POST /v1/reconciliation/batch` para conciliación masiva por rango de fechas
 - [ ] Integrar Spring Security (JWT) — `OpenApiConfig` ya tiene el esquema bearer definido
 - [ ] Agregar plugin JaCoCo al `pom.xml` para reporte de cobertura
-- [ ] Configurar `git init` y `.gitignore` (excluir `.env`, `target/`)
+- [x] Configurar `git init` y `.gitignore` (excluir `.env`, `target/`)
 - [ ] Migrar a modelo Event-Driven (Kafka) — roadmap detallado en `docs/DESIGN_DECISIONS.md`
