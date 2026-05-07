@@ -1,0 +1,86 @@
+services:
+
+  # ===========================================================================
+  # PostgreSQL — base de datos principal
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: reconciliation-postgres
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - reconciliation-net
+
+  # ===========================================================================
+  # WireMock — stub del procesador externo de pagos (solo desarrollo)
+  # ===========================================================================
+  wiremock:
+    image: wiremock/wiremock:3.6.0
+    container_name: reconciliation-wiremock
+    restart: unless-stopped
+    ports:
+      - "9090:8080"
+    volumes:
+      - ./docker/wiremock/mappings:/home/wiremock/mappings:ro
+    command: [ "--verbose", "--global-response-templating" ]
+    networks:
+      - reconciliation-net
+
+  # ===========================================================================
+  # Aplicación Spring Boot
+  # ===========================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reconciliation-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Sobreescribe el datasource para apuntar al contenedor postgres (no a localhost)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5435/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      PROCESSOR_BASE_URL: ${PROCESSOR_BASE_URL}
+      PROCESSOR_API_KEY: ${PROCESSOR_API_KEY}
+      # Activa el perfil docker para logging y configuración específica
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wiremock:
+        condition: service_started
+    networks:
+      - reconciliation-net
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/api/actuator/health || exit 1" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  postgres_data:
+    name: reconciliation-postgres-data
+
+networks:
+  reconciliation-net:
+    name: reconciliation-network
+    driver: bridge

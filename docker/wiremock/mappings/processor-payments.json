@@ -1,0 +1,437 @@
+{
+  "mappings": [
+
+    {
+      "name": "POST /auth/token - valid credentials -> token",
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "url": "/auth/token",
+        "bodyPatterns": [
+          { "matchesJsonPath": "$[?(@.username == 'reconciliation-service')]" },
+          { "matchesJsonPath": "$[?(@.password == 'secret-2024')]" },
+          { "matchesJsonPath": "$[?(@.channel == 'API')]" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "access_token": "test-token-wiremock-2024",
+          "token_type": "Bearer",
+          "expires_in": 3600
+        }
+      }
+    },
+
+    {
+      "name": "POST /auth/token - invalid credentials -> 401",
+      "priority": 10,
+      "request": {
+        "method": "POST",
+        "url": "/auth/token"
+      },
+      "response": {
+        "status": 401,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "error": "INVALID_CREDENTIALS",
+          "message": "Username, password or channel are incorrect"
+        }
+      }
+    },
+
+    {
+      "name": "GET /payments/* - missing auth token -> 401",
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPattern": "/payments/.*",
+        "headers": {
+          "Authorization": { "absent": true }
+        }
+      },
+      "response": {
+        "status": 401,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "error": "UNAUTHORIZED",
+          "message": "Missing Authorization header. Obtain a token via POST /auth/token"
+        }
+      }
+    },
+
+    {
+      "name": "pay_abc123 - CONCILIATED",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_abc123",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_abc123", "amount": 100.00, "currency": "USD",
+          "status": "APPROVED", "description": "E-commerce purchase - Nike Store",
+          "processed_at": "2024-06-15T10:01:00"
+        }
+      }
+    },
+    {
+      "name": "pay_c001 - CONCILIATED",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_c001",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_c001", "amount": 50.00, "currency": "USD",
+          "status": "APPROVED", "description": "Coffee shop - Starbucks",
+          "processed_at": "2024-06-15T14:00:30"
+        }
+      }
+    },
+    {
+      "name": "pay_c002 - CONCILIATED",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_c002",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_c002", "amount": 199.99, "currency": "EUR",
+          "status": "APPROVED", "description": "Online marketplace - Amazon",
+          "processed_at": "2024-06-16T09:30:45"
+        }
+      }
+    },
+    {
+      "name": "pay_c003 - CONCILIATED",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_c003",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_c003", "amount": 1500.00, "currency": "USD",
+          "status": "APPROVED", "description": "Flight booking - Delta Airlines",
+          "processed_at": "2024-06-16T15:00:10"
+        }
+      }
+    },
+    {
+      "name": "pay_c004 - CONCILIATED",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_c004",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_c004", "amount": 85.00, "currency": "GBP",
+          "status": "APPROVED", "description": "Restaurant - The Fat Duck",
+          "processed_at": "2024-06-17T12:01:00"
+        }
+      }
+    },
+    {
+      "name": "pay_c005 - CONCILIATED",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_c005",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_c005", "amount": 29.99, "currency": "USD",
+          "status": "APPROVED", "description": "Streaming subscription - Netflix",
+          "processed_at": "2024-06-17T08:00:15"
+        }
+      }
+    },
+
+    {
+      "name": "pay_disc001 - DISCREPANCY_AMOUNT (internal 100.00 / processor 95.00)",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_disc001",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_disc001", "amount": 95.00, "currency": "USD",
+          "status": "APPROVED", "description": "Subscription - Spotify Premium",
+          "processed_at": "2024-06-15T11:00:30"
+        }
+      }
+    },
+    {
+      "name": "pay_d001 - DISCREPANCY_AMOUNT (internal 500.00 / processor 499.50)",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_d001",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_d001", "amount": 499.50, "currency": "USD",
+          "status": "APPROVED", "description": "Wholesale order - Sysco Foods",
+          "processed_at": "2024-06-18T08:00:20"
+        }
+      }
+    },
+    {
+      "name": "pay_d002 - DISCREPANCY_AMOUNT (internal 1200.00 / processor 1050.00)",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_d002",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_d002", "amount": 1050.00, "currency": "USD",
+          "status": "APPROVED", "description": "Electronics - Apple Store",
+          "processed_at": "2024-06-18T11:00:10"
+        }
+      }
+    },
+    {
+      "name": "pay_d003 - DISCREPANCY_AMOUNT (internal 75.00 / processor 82.50)",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_d003",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_d003", "amount": 82.50, "currency": "EUR",
+          "status": "APPROVED", "description": "Medical services - Dr. Martinez",
+          "processed_at": "2024-06-18T16:00:45"
+        }
+      }
+    },
+
+    {
+      "name": "pay_date001 - DISCREPANCY_DATE (processor +2h)",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_date001",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_date001", "amount": 75.50, "currency": "EUR",
+          "status": "APPROVED", "description": "Hotel booking - Marriott",
+          "processed_at": "2024-06-15T11:00:00"
+        }
+      }
+    },
+    {
+      "name": "pay_dt001 - DISCREPANCY_DATE (processor +30 min)",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_dt001",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_dt001", "amount": 320.00, "currency": "USD",
+          "status": "APPROVED", "description": "Car rental - Hertz",
+          "processed_at": "2024-06-19T10:30:00"
+        }
+      }
+    },
+    {
+      "name": "pay_dt002 - DISCREPANCY_DATE (processor +1 day)",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_dt002",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_dt002", "amount": 640.00, "currency": "USD",
+          "status": "APPROVED", "description": "Consulting services - Accenture",
+          "processed_at": "2024-06-20T14:00:00"
+        }
+      }
+    },
+
+    {
+      "name": "pay_multi001 - MULTIPLE_DISCREPANCIES",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_multi001",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_multi001", "amount": 285.00, "currency": "USD",
+          "status": "APPROVED", "description": "SaaS platform - Salesforce",
+          "processed_at": "2024-06-20T12:30:00"
+        }
+      }
+    },
+    {
+      "name": "pay_multi002 - MULTIPLE_DISCREPANCIES",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_multi002",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_multi002", "amount": 160.00, "currency": "EUR",
+          "status": "APPROVED", "description": "Logistics - DHL Express",
+          "processed_at": "2024-06-21T09:00:00"
+        }
+      }
+    },
+
+    {
+      "name": "pay_missing - MISSING_IN_PROCESSOR",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_missing",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 404,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "error": "PAYMENT_NOT_FOUND", "message": "Payment pay_missing not found" }
+      }
+    },
+    {
+      "name": "pay_mp001 - MISSING_IN_PROCESSOR",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_mp001",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 404,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "error": "PAYMENT_NOT_FOUND", "message": "Payment pay_mp001 not found" }
+      }
+    },
+    {
+      "name": "pay_mp002 - MISSING_IN_PROCESSOR",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_mp002",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 404,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "error": "PAYMENT_NOT_FOUND", "message": "Payment pay_mp002 not found" }
+      }
+    },
+
+    {
+      "name": "pay_extonly - MISSING_IN_INTERNAL",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_extonly",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_extonly", "amount": 300.00, "currency": "USD",
+          "status": "APPROVED", "description": "Refund - Amazon",
+          "processed_at": "2024-06-15T14:00:00"
+        }
+      }
+    },
+    {
+      "name": "pay_ext001 - MISSING_IN_INTERNAL",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_ext001",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_ext001", "amount": 750.00, "currency": "USD",
+          "status": "APPROVED", "description": "Chargeback reversal - Visa",
+          "processed_at": "2024-06-22T10:00:00"
+        }
+      }
+    },
+    {
+      "name": "pay_ext002 - MISSING_IN_INTERNAL",
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "url": "/payments/pay_ext002",
+        "headers": { "Authorization": { "equalTo": "Bearer test-token-wiremock-2024" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "id": "pay_ext002", "amount": 45.00, "currency": "EUR",
+          "status": "APPROVED", "description": "Adjustment - PayPal",
+          "processed_at": "2024-06-22T15:30:00"
+        }
+      }
+    }
+
+  ]
+}

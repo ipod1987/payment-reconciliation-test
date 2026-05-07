@@ -1,0 +1,12 @@
+# Perfil activo cuando SPRING_PROFILES_ACTIVE=docker
+# Sobreescribe solo lo que difiere del perfil base (application.yml).
+
+spring:
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    com.fintech.reconciliation: INFO
+    org.hibernate.SQL: WARN
+    org.flywaydb: INFO

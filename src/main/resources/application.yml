@@ -1,0 +1,90 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: payment-reconciliation
+  datasource:
+    url: jdbc:postgresql://localhost:5435/payments
+    username: ${DB_USERNAME:reconciliation_user}
+    password: ${DB_PASSWORD:reconciliation_pass}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# External Payment Processor
+payment-processor:
+  base-url: ${PROCESSOR_BASE_URL:https://api.payment-processor.com}
+  timeout-ms: 5000
+  auth:
+    url: /auth/token
+    username: ${PROCESSOR_USERNAME:reconciliation-service}
+    password: ${PROCESSOR_PASSWORD:secret-2024}
+    channel: ${PROCESSOR_CHANNEL:API}
+
+# Resilience4j - Circuit Breaker para el cliente externo
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentProcessor:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 30s
+        failure-rate-threshold: 50
+        record-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+  retry:
+    instances:
+      paymentProcessor:
+        max-attempts: 3
+        wait-duration: 500ms
+        exponential-backoff-multiplier: 2
+
+# SpringDoc / Swagger
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  info:
+    title: Payment Reconciliation API
+    description: API para conciliación de pagos entre sistema interno y procesador externo
+    version: 1.0.0
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers
+  endpoint:
+    health:
+      show-details: when-authorized
+
+logging:
+  level:
+    com.fintech.reconciliation: INFO
+    org.hibernate.SQL: DEBUG

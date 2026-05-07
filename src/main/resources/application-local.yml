@@ -1,0 +1,6 @@
+payment-processor:
+  base-url: http://localhost:9090
+  auth:
+    username: reconciliation-service
+    password: secret-2024
+    channel: API
