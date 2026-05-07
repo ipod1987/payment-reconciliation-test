@@ -2,6 +2,8 @@
 
 REST API that performs **3-way reconciliation** of payments across three independent sources: the internal database, a JSON/REST processor, and a legacy SOAP processor. Returns a structured result indicating whether the payment is fully reconciled or which discrepancy was detected and where.
 
+![Swagger UI](swagger.png)
+
 ---
 
 ## Requirements
@@ -38,6 +40,8 @@ That's it. The API is ready at `http://localhost:8080/api`.
 | **WireMock — JSON processor** | http://localhost:9091/\_\_admin/mappings | Stubs for REST payment processor |
 | **WireMock — SOAP processor** | http://localhost:9092/\_\_admin/mappings | Stubs for XML/SOAP payment processor |
 | **PostgreSQL** | localhost:5435 / db `payments` | Internal payment storage |
+
+
 
 ### Useful make targets
 
