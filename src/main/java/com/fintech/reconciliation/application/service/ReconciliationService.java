@@ -3,7 +3,6 @@ package com.fintech.reconciliation.application.service;
 import com.fintech.reconciliation.application.port.in.ReconcilePaymentUseCase;
 import com.fintech.reconciliation.application.port.out.LoadInternalPaymentPort;
 import com.fintech.reconciliation.application.port.out.LoadProcessorPaymentPort;
-import com.fintech.reconciliation.application.port.out.LoadReconciliationResultPort;
 import com.fintech.reconciliation.application.port.out.LoadSoapProcessorPaymentPort;
 import com.fintech.reconciliation.application.port.out.SaveReconciliationResultPort;
 import com.fintech.reconciliation.domain.exception.PaymentNotFoundException;
@@ -24,10 +23,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class ReconciliationService implements ReconcilePaymentUseCase {
 
-    private final LoadInternalPaymentPort      loadInternalPayment;
-    private final LoadProcessorPaymentPort     loadProcessorPayment;
+    private final LoadInternalPaymentPort loadInternalPayment;
+    private final LoadProcessorPaymentPort loadProcessorPayment;
     private final LoadSoapProcessorPaymentPort loadSoapProcessorPayment;
-    private final LoadReconciliationResultPort loadReconciliationResult;
     private final SaveReconciliationResultPort saveReconciliationResult;
 
     @Override
@@ -38,31 +36,31 @@ public class ReconciliationService implements ReconcilePaymentUseCase {
 
         // ── fetch all three sources concurrently ──────────────────────────────
         Mono<Optional<Payment>> internalMono = Mono
-            .fromCallable(() -> loadInternalPayment.findInternalPaymentById(rawPaymentId))
-            .subscribeOn(Schedulers.boundedElastic());
+                .fromCallable(() -> loadInternalPayment.findInternalPaymentById(rawPaymentId))
+                .subscribeOn(Schedulers.boundedElastic());
 
         Mono<Optional<Payment>> jsonProcessorMono = Mono
-            .fromCallable(() -> loadProcessorPayment.findProcessorPaymentById(rawPaymentId))
-            .subscribeOn(Schedulers.boundedElastic());
+                .fromCallable(() -> loadProcessorPayment.findProcessorPaymentById(rawPaymentId))
+                .subscribeOn(Schedulers.boundedElastic());
 
         Mono<Optional<Payment>> soapProcessorMono = Mono
-            .fromCallable(() -> loadSoapProcessorPayment.findSoapProcessorPaymentById(rawPaymentId))
-            .subscribeOn(Schedulers.boundedElastic());
+                .fromCallable(() -> loadSoapProcessorPayment.findSoapProcessorPaymentById(rawPaymentId))
+                .subscribeOn(Schedulers.boundedElastic());
 
         ReconciliationResult result = Mono.zip(internalMono, jsonProcessorMono, soapProcessorMono)
-            .map(tuple -> {
-                Optional<Payment> internal  = tuple.getT1();
-                Optional<Payment> json      = tuple.getT2();
-                Optional<Payment> soap      = tuple.getT3();
+                .map(tuple -> {
+                    Optional<Payment> internal = tuple.getT1();
+                    Optional<Payment> json = tuple.getT2();
+                    Optional<Payment> soap = tuple.getT3();
 
-                if (internal.isEmpty() && json.isEmpty() && soap.isEmpty()) {
-                    log.warn("Payment not found in any source: paymentId={}", rawPaymentId);
-                    throw new PaymentNotFoundException(rawPaymentId);
-                }
+                    if (internal.isEmpty() && json.isEmpty() && soap.isEmpty()) {
+                        log.warn("Payment not found in any source: paymentId={}", rawPaymentId);
+                        throw new PaymentNotFoundException(rawPaymentId);
+                    }
 
-                return PaymentComparisonKernel.buildResult(paymentId, internal, json, soap);
-            })
-            .block();
+                    return PaymentComparisonKernel.buildResult(paymentId, internal, json, soap);
+                })
+                .block();
 
         if (result == null) {
             throw new PaymentNotFoundException(rawPaymentId);

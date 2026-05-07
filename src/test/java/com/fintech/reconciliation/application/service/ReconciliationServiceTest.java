@@ -2,7 +2,6 @@ package com.fintech.reconciliation.application.service;
 
 import com.fintech.reconciliation.application.port.out.LoadInternalPaymentPort;
 import com.fintech.reconciliation.application.port.out.LoadProcessorPaymentPort;
-import com.fintech.reconciliation.application.port.out.LoadReconciliationResultPort;
 import com.fintech.reconciliation.application.port.out.LoadSoapProcessorPaymentPort;
 import com.fintech.reconciliation.application.port.out.SaveReconciliationResultPort;
 import com.fintech.reconciliation.domain.exception.PaymentNotFoundException;
@@ -26,9 +25,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ReconciliationService — 3-way reconciliation")
@@ -37,11 +40,14 @@ class ReconciliationServiceTest {
     private static final String PAYMENT_ID = "pay_test_001";
     private static final LocalDateTime BASE_DATE = LocalDateTime.of(2024, 6, 15, 10, 0, 0);
 
-    @Mock private LoadInternalPaymentPort      loadInternalPayment;
-    @Mock private LoadProcessorPaymentPort     loadProcessorPayment;
-    @Mock private LoadSoapProcessorPaymentPort loadSoapProcessorPayment;
-    @Mock private LoadReconciliationResultPort loadReconciliationResult;
-    @Mock private SaveReconciliationResultPort saveReconciliationResult;
+    @Mock
+    private LoadInternalPaymentPort loadInternalPayment;
+    @Mock
+    private LoadProcessorPaymentPort loadProcessorPayment;
+    @Mock
+    private LoadSoapProcessorPaymentPort loadSoapProcessorPayment;
+    @Mock
+    private SaveReconciliationResultPort saveReconciliationResult;
 
     @InjectMocks
     private ReconciliationService sut;
@@ -67,21 +73,21 @@ class ReconciliationServiceTest {
 
     private Payment buildPayment(String amount, String currency, LocalDateTime date, Payment.PaymentSource source) {
         return Payment.builder()
-            .id(PaymentId.of(PAYMENT_ID))
-            .amount(Money.of(new BigDecimal(amount), currency))
-            .status("APPROVED")
-            .transactionDate(date)
-            .source(source)
-            .build();
+                .id(PaymentId.of(PAYMENT_ID))
+                .amount(Money.of(new BigDecimal(amount), currency))
+                .status("APPROVED")
+                .transactionDate(date)
+                .source(source)
+                .build();
     }
 
     private void stubAll(Payment internal, Payment json, Payment soap) {
         when(loadInternalPayment.findInternalPaymentById(PAYMENT_ID))
-            .thenReturn(Optional.ofNullable(internal));
+                .thenReturn(Optional.ofNullable(internal));
         when(loadProcessorPayment.findProcessorPaymentById(PAYMENT_ID))
-            .thenReturn(Optional.ofNullable(json));
+                .thenReturn(Optional.ofNullable(json));
         when(loadSoapProcessorPayment.findSoapProcessorPaymentById(PAYMENT_ID))
-            .thenReturn(Optional.ofNullable(soap));
+                .thenReturn(Optional.ofNullable(soap));
     }
 
     // ── all three present ─────────────────────────────────────────────────────
@@ -115,9 +121,9 @@ class ReconciliationServiceTest {
             assertThat(result.getStatus()).isEqualTo(ReconciliationStatus.DISCREPANCY_AMOUNT);
             assertThat(result.getDiscrepancies()).hasSize(1);
             assertThat(result.getDiscrepancies().get(0).getType())
-                .isEqualTo(Discrepancy.DiscrepancyType.AMOUNT_MISMATCH);
+                    .isEqualTo(Discrepancy.DiscrepancyType.AMOUNT_MISMATCH);
             assertThat(result.getDiscrepancies().get(0).getProcessorSource())
-                .isEqualTo("JSON_PROCESSOR");
+                    .isEqualTo("JSON_PROCESSOR");
         }
 
         @Test
@@ -130,7 +136,7 @@ class ReconciliationServiceTest {
             assertThat(result.getStatus()).isEqualTo(ReconciliationStatus.DISCREPANCY_AMOUNT);
             assertThat(result.getDiscrepancies()).hasSize(1);
             assertThat(result.getDiscrepancies().get(0).getProcessorSource())
-                .isEqualTo("SOAP_PROCESSOR");
+                    .isEqualTo("SOAP_PROCESSOR");
         }
 
         @Test
@@ -138,7 +144,7 @@ class ReconciliationServiceTest {
         void multipleDiscrepanciesAcrossBothSources() {
             // JSON disagrees on amount, SOAP disagrees on date
             Payment jsonWithDiffAmount = buildPayment("88.00", "USD", BASE_DATE, Payment.PaymentSource.PROCESSOR);
-            Payment soapWithDiffDate   = buildPayment("100.00", "USD", BASE_DATE.plusHours(2), Payment.PaymentSource.SOAP_PROCESSOR);
+            Payment soapWithDiffDate = buildPayment("100.00", "USD", BASE_DATE.plusHours(2), Payment.PaymentSource.SOAP_PROCESSOR);
 
             when(loadInternalPayment.findInternalPaymentById(PAYMENT_ID)).thenReturn(Optional.of(internal("100.00")));
             when(loadProcessorPayment.findProcessorPaymentById(PAYMENT_ID)).thenReturn(Optional.of(jsonWithDiffAmount));
@@ -163,7 +169,7 @@ class ReconciliationServiceTest {
             assertThat(result.getStatus()).isEqualTo(ReconciliationStatus.DISCREPANCY_DATE);
             assertThat(result.getDiscrepancies()).hasSize(1);
             assertThat(result.getDiscrepancies().get(0).getType())
-                .isEqualTo(Discrepancy.DiscrepancyType.DATE_MISMATCH);
+                    .isEqualTo(Discrepancy.DiscrepancyType.DATE_MISMATCH);
         }
 
         @Test
@@ -253,8 +259,8 @@ class ReconciliationServiceTest {
             stubAll(null, null, null);
 
             assertThatThrownBy(() -> sut.reconcile(PAYMENT_ID))
-                .isInstanceOf(PaymentNotFoundException.class)
-                .hasMessageContaining(PAYMENT_ID);
+                    .isInstanceOf(PaymentNotFoundException.class)
+                    .hasMessageContaining(PAYMENT_ID);
         }
     }
 
@@ -282,7 +288,7 @@ class ReconciliationServiceTest {
             stubAll(null, null, null);
 
             assertThatThrownBy(() -> sut.reconcile(PAYMENT_ID))
-                .isInstanceOf(PaymentNotFoundException.class);
+                    .isInstanceOf(PaymentNotFoundException.class);
 
             verifyNoInteractions(saveReconciliationResult);
         }
