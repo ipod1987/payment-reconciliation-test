@@ -193,6 +193,57 @@ curl -s http://localhost:8080/api/v1/reconciliation/pay_abc123 \
 
 ---
 
+## 14. Gradle over Maven
+
+**Decision:** Gradle 8.8 with Kotlin DSL (`build.gradle.kts`) is used as the build tool instead of Maven.
+
+**Why:**
+- **Incremental builds:** Gradle tracks task inputs and outputs at a fine-grained level and skips anything that hasn't changed. On a typical compile-test cycle this is noticeably faster than Maven's phase-based model, which re-executes phases even when nothing relevant changed.
+- **Kotlin DSL:** `build.gradle.kts` is statically typed — the IDE provides full autocomplete, refactoring support, and type-safe access to the plugin API. Maven's XML gives none of that.
+- **Annotation processor ordering:** Lombok must run before MapStruct. In Gradle this is expressed explicitly with `lombok-mapstruct-binding` in the `annotationProcessor` configuration. In Maven it requires fragile `<execution>` ordering in the `maven-compiler-plugin` that is easy to get wrong and hard to debug when it breaks.
+- **Docker build alignment:** The `Dockerfile` uses `gradle:8.8-jdk21-alpine` as the builder image, keeping the container build and the local build on the same version. There is no equivalent official Maven+Java 21 image with the same guarantee.
+
+**Trade-off:** Gradle has a steeper learning curve than Maven for developers new to it, and the Kotlin DSL error messages can be cryptic. Maven's XML verbosity is at least familiar to most Java developers. For a single-service project the difference is minor — the decision was made in favour of build speed and IDE ergonomics.
+
+---
+
+## 15. What Was Not Implemented — Next Steps
+
+This section documents the scope boundaries of the current implementation and the concrete next steps if development were to continue.
+
+### What is intentionally out of scope
+
+**A. Query / filter endpoint**
+The API currently only supports point-in-time reconciliation of a single payment by ID (`GET /v1/reconciliation/{paymentId}`). There is no endpoint to query historical results, filter by status, or paginate over a time range. A natural next step would be:
+```
+GET /v1/reconciliation?status=DISCREPANCY_AMOUNT&from=2024-06-01&to=2024-06-30&page=0&size=20
+```
+The `reconciliation_results` table already has the indexes required for this query (`idx_reconciliation_status`, `idx_reconciliation_reconciled_at_pid`). The work remaining is the controller endpoint, a Spring Data JPA `Specification` or `@Query`, and a paginated response DTO.
+
+**B. Batch reconciliation**
+There is no way to reconcile a range of payments in a single request. A `POST /v1/reconciliation/batch` endpoint accepting a list of payment IDs (or a date range) would be valuable for end-of-day settlement runs. The main design consideration would be choosing between synchronous response (feasible for small batches), async with a job ID and polling, or event-driven via a message broker.
+
+**C. Idempotency / TTL cache**
+`LoadReconciliationResultPort` exists as an output port and is wired into `ReconciliationService` as a constructor dependency, but its result is never consulted before triggering a new reconciliation. Adding a TTL check (e.g., skip re-reconciling a payment that was already reconciled less than 5 minutes ago) would reduce redundant external calls during burst traffic. The infrastructure is already in place — the change is a single conditional in `ReconciliationService.reconcile()`.
+
+**D. Production authentication**
+`AuthController` uses a hardcoded in-memory `Map` of dev credentials (`admin/admin123`, `reconciler/reconciler2024`). This is explicitly a development shortcut. A production deployment would replace it with a `UserDetailsService` backed by a database, or delegate entirely to an external identity provider (Keycloak, Auth0, AWS Cognito) via OAuth2 resource server configuration — Spring Security supports this with minimal code change.
+
+**E. Test coverage tooling**
+There is no JaCoCo plugin configured in `build.gradle.kts`. Adding it would produce HTML and XML coverage reports on `gradle test`. Given the current test suite covers the domain service (13 tests), the domain value object (5 tests), and the controller layer (4 tests), a coverage baseline could be established and enforced as a build gate.
+
+**F. Event-driven reconciliation (Kafka)**
+The current model is synchronous and request-driven: a caller must actively trigger reconciliation. A more scalable approach for high-volume fintechs would be event-driven: when a payment is processed internally, an event is published to a Kafka topic, and a reconciliation consumer picks it up asynchronously and runs the 3-way comparison without any HTTP request from an operator. The hexagonal architecture makes this straightforward — a new `KafkaPaymentEventConsumer` implementing `ReconcilePaymentUseCase` would be the only addition; the domain and application layers would be untouched.
+
+**G. Operational concerns at scale**
+The `reconciliation_results` table is append-only and grows without bound. Before production, the following would be required:
+- Partitioning by `reconciled_at` (PostgreSQL declarative partitioning by month or quarter)
+- An archival job that moves old partitions to cold storage
+- A rate limiter on the reconciliation endpoint to protect against bursts that could exhaust the Hikari connection pool or trip the circuit breaker unintentionally
+- Structured logging with a correlation ID per reconciliation request to make distributed tracing viable
+
+---
+
 ## Requirement Coverage Matrix
 
 | Challenge Requirement | Where It Is Implemented |
