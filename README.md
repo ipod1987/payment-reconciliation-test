@@ -49,6 +49,7 @@ That's it. The API is ready at `http://localhost:8080/api`.
 make up          # start all services
 make up-db       # start only postgres + both wiremocks (run the app from IDE)
 make seed        # insert demo payments
+make test        # run unit tests via Docker (no local Java/Gradle needed)
 make down        # stop containers (data persists)
 make down-v      # stop containers AND delete volumes
 make logs-app    # tail application logs
@@ -272,17 +273,23 @@ All IDs below are pre-loaded by `make seed` and stubbed in WireMock.
 
 ## Running Tests
 
-Java 21 and a local Gradle installation (or the one downloaded by the wrapper) are required.
+Tests run inside Docker — no local Java or Gradle installation required.
 
 ```bash
-# All tests
+# All tests (uses gradle:8.8-jdk21-alpine — same image as the Docker build)
+make test
+
+# Open the HTML test report after the run
+open build/reports/tests/test/index.html
+```
+
+If you have Java 21 and Gradle 8.8+ installed locally:
+
+```bash
 gradle test
 
 # Only the reconciliation service (unit, no Spring context)
 gradle test --tests "*.ReconciliationServiceTest"
-
-# Open the HTML test report
-open build/reports/tests/test/index.html
 ```
 
 **Test suite coverage**

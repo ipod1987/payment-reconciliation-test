@@ -55,7 +55,7 @@ class ReconciliationControllerTest {
     private ReconcilePaymentUseCase reconcilePaymentUseCase;
 
     @Test
-    @DisplayName("GET /{paymentId} returns 200 with CONCILIATED status")
+    @DisplayName("GET /{paymentId} returns 200 with CONCILIATED status — all three sources present")
     void returns200WithConciliatedStatus() throws Exception {
         String paymentId = "pay_abc123";
         ReconciliationResult conciliated = buildConciliatedResult(paymentId);
@@ -70,7 +70,8 @@ class ReconciliationControllerTest {
             .andExpect(jsonPath("$.fullyReconciled").value(true))
             .andExpect(jsonPath("$.discrepancies").isEmpty())
             .andExpect(jsonPath("$.internalPayment").exists())
-            .andExpect(jsonPath("$.processorPayment").exists());
+            .andExpect(jsonPath("$.processorPayment").exists())
+            .andExpect(jsonPath("$.soapProcessorPayment").exists());
     }
 
     @Test
@@ -122,9 +123,10 @@ class ReconciliationControllerTest {
     // -------------------------------------------------------------------------
 
     private ReconciliationResult buildConciliatedResult(String paymentId) {
-        Payment internal = buildPayment(paymentId, "100.00", Payment.PaymentSource.INTERNAL);
-        Payment processor = buildPayment(paymentId, "100.00", Payment.PaymentSource.PROCESSOR);
-        return ReconciliationResult.conciliated(PaymentId.of(paymentId), internal, processor);
+        Payment internal  = buildPayment(paymentId, "100.00", Payment.PaymentSource.INTERNAL);
+        Payment json      = buildPayment(paymentId, "100.00", Payment.PaymentSource.PROCESSOR);
+        Payment soap      = buildPayment(paymentId, "100.00", Payment.PaymentSource.SOAP_PROCESSOR);
+        return ReconciliationResult.conciliated(PaymentId.of(paymentId), internal, json, soap);
     }
 
     private ReconciliationResult buildDiscrepancyResult(String paymentId) {

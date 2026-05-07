@@ -68,7 +68,7 @@ services:
     env_file: .env
     environment:
       # Sobreescribe el datasource para apuntar al contenedor postgres (no a localhost)
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5435/${POSTGRES_DB}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       PROCESSOR_BASE_URL: http://wiremock-json:8080

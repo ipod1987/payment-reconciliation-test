@@ -6,7 +6,7 @@ spring:
     show-sql: false
 
 soap-processor:
-  base-url: http://wiremock:8080
+  base-url: http://wiremock-soap:8080
 
 logging:
   level:

@@ -1,4 +1,4 @@
-.PHONY: help build up down logs ps clean seed
+.PHONY: help build test up down logs ps clean seed
 
 # Variables
 COMPOSE = docker compose
@@ -13,6 +13,14 @@ help: ## Muestra esta ayuda
 
 build: ## Construye la imagen de la aplicación
 	$(COMPOSE) build --no-cache $(APP)
+
+test: ## Corre los tests unitarios (no requiere Java instalado — usa imagen Docker)
+	docker run --rm \
+	  -v "$(CURDIR)":/project \
+	  -w /project \
+	  gradle:8.8-jdk21-alpine \
+	  gradle test --no-daemon
+	@echo "Test report: build/reports/tests/test/index.html"
 
 up: ## Levanta todos los servicios (postgres + wiremock-json + wiremock-soap + app)
 	$(COMPOSE) up -d

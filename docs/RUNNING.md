@@ -3,72 +3,72 @@
 ## Prerrequisitos
 
 - Java 21+
-- Maven 3.9+
-- Docker & Docker Compose (para PostgreSQL)
+- Docker & Docker Compose
 
 ---
 
-## 1. Levantar la base de datos
+## 1. Levantar el entorno completo
 
 ```bash
-# Crear y arrancar PostgreSQL con Docker
-docker run -d \
-  --name reconciliation-db \
-  -e POSTGRES_DB=reconciliation_db \
-  -e POSTGRES_USER=reconciliation_user \
-  -e POSTGRES_PASSWORD=reconciliation_pass \
-  -p 5435:5432 \
-  postgres:16-alpine
+# Construye la imagen y arranca PostgreSQL, WireMock (JSON + SOAP) y la aplicación
+docker compose up -d
 
-# Verificar que está corriendo
-docker ps | grep reconciliation-db
+# Ver logs de la aplicación
+make logs-app
 ```
 
----
-
-## 2. Compilar y ejecutar
-
-```bash
-cd payment-reconciliation
-
-# Compilar (genera código de MapStruct)
-./mvnw clean compile
-
-# Ejecutar tests unitarios
-./mvnw test
-
-# Arrancar la aplicación
-./mvnw spring-boot:run
-```
-
-La API quedará disponible en: `http://localhost:8080/api`
+La API quedará disponible en: `http://localhost:8080/api`  
 Swagger UI: `http://localhost:8080/api/swagger-ui.html`
 
+> **Solo infraestructura (sin la app):** `make up-db`  
+> Útil para ejecutar la app desde el IDE con perfil `local`.
+
 ---
 
-## 3. Insertar datos de prueba
+## 2. Insertar datos de prueba
 
-```sql
--- Conectar a PostgreSQL
-psql -h localhost -U reconciliation_user -d reconciliation_db
+```bash
+make seed
+```
 
--- Insertar pagos de prueba en el sistema interno
-INSERT INTO internal_payments (payment_id, amount, currency, status, description, transaction_date)
-VALUES
-  ('pay_abc123', 100.00, 'USD', 'APPROVED', 'E-commerce purchase', '2024-06-15 10:00:00'),
-  ('pay_disc001', 100.00, 'USD', 'APPROVED', 'Subscription payment', '2024-06-15 11:00:00'),
-  ('pay_missing', 250.00, 'USD', 'APPROVED', 'Wire transfer',       '2024-06-15 12:00:00');
+Esto ejecuta `docker/postgres/init/01_seed_data.sql` e inserta 5 pagos en `internal_payments`.
+
+---
+
+## 3. Obtener token JWT
+
+Todos los endpoints de reconciliación requieren Bearer token.
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' | jq -r .accessToken
+```
+
+Credenciales de desarrollo disponibles:
+
+| Username | Password |
+|----------|----------|
+| `admin` | `admin123` |
+| `reconciler` | `reconciler2024` |
+
+Guarda el token para usarlo en las siguientes peticiones:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' | jq -r .accessToken)
 ```
 
 ---
 
 ## 4. curl de prueba
 
-### Caso 1: Pago conciliado correctamente
+### Caso 1: Pago conciliado correctamente (CONCILIATED)
 
 ```bash
-curl -s -X GET "http://localhost:8080/api/v1/reconciliation/pay_abc123" \
-  -H "Accept: application/json" | jq .
+curl -s http://localhost:8080/api/v1/reconciliation/pay_abc123 \
+  -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 **Respuesta esperada:**
@@ -76,96 +76,55 @@ curl -s -X GET "http://localhost:8080/api/v1/reconciliation/pay_abc123" \
 {
   "paymentId": "pay_abc123",
   "status": "CONCILIATED",
-  "statusDescription": "Payment matches across both systems",
+  "statusDescription": "Payment matches across all three systems",
   "fullyReconciled": true,
-  "discrepancies": [],
-  "internalPayment": {
-    "paymentId": "pay_abc123",
-    "amount": "100.00",
-    "currency": "USD",
-    "status": "APPROVED",
-    "transactionDate": "2024-06-15T10:00:00",
-    "source": "INTERNAL"
-  },
-  "processorPayment": {
-    "paymentId": "pay_abc123",
-    "amount": "100.00",
-    "currency": "USD",
-    "status": "APPROVED",
-    "transactionDate": "2024-06-15T10:00:00",
-    "source": "PROCESSOR"
-  },
-  "reconciledAt": "2024-06-15T10:05:00"
+  "discrepancies": []
 }
 ```
 
 ---
 
-### Caso 2: Discrepancia de monto
+### Caso 2: Discrepancia de monto (DISCREPANCY_AMOUNT)
 
 ```bash
-curl -s -X GET "http://localhost:8080/api/v1/reconciliation/pay_disc001" \
-  -H "Accept: application/json" | jq .
-```
-
-**Respuesta esperada:**
-```json
-{
-  "paymentId": "pay_disc001",
-  "status": "DISCREPANCY_AMOUNT",
-  "statusDescription": "Amount mismatch between internal and processor",
-  "fullyReconciled": false,
-  "discrepancies": [
-    {
-      "type": "AMOUNT_MISMATCH",
-      "field": "amount",
-      "internalValue": "100.00 USD",
-      "processorValue": "95.00 USD"
-    }
-  ],
-  "internalPayment": { ... },
-  "processorPayment": { ... },
-  "reconciledAt": "2024-06-15T10:05:01"
-}
+curl -s http://localhost:8080/api/v1/reconciliation/pay_disc001 \
+  -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ---
 
-### Caso 3: Pago ausente en procesador (MISSING_IN_PROCESSOR)
+### Caso 3: Ausente en procesador SOAP (MISSING_IN_SOAP_PROCESSOR)
 
 ```bash
-curl -s -X GET "http://localhost:8080/api/v1/reconciliation/pay_missing" \
-  -H "Accept: application/json" | jq .
-```
-
-**Respuesta esperada:**
-```json
-{
-  "paymentId": "pay_missing",
-  "status": "MISSING_IN_PROCESSOR",
-  "statusDescription": "Payment found in internal system but missing in processor",
-  "fullyReconciled": false,
-  "discrepancies": [
-    {
-      "type": "MISSING_RECORD",
-      "field": "paymentId",
-      "internalValue": "pay_missing",
-      "processorValue": null
-    }
-  ],
-  "internalPayment": { ... },
-  "processorPayment": null,
-  "reconciledAt": "2024-06-15T10:05:02"
-}
+curl -s http://localhost:8080/api/v1/reconciliation/pay_missing \
+  -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 ---
 
-### Caso 4: Pago no encontrado en ninguna fuente (404)
+### Caso 4: Discrepancia de fecha (DISCREPANCY_DATE)
 
 ```bash
-curl -s -X GET "http://localhost:8080/api/v1/reconciliation/pay_ghost" \
-  -H "Accept: application/json" | jq .
+curl -s http://localhost:8080/api/v1/reconciliation/pay_date001 \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
+### Caso 5: Pago ausente en sistema interno (MISSING_IN_INTERNAL)
+
+```bash
+curl -s http://localhost:8080/api/v1/reconciliation/pay_extonly \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
+
+### Caso 6: Pago no encontrado en ninguna fuente (404)
+
+```bash
+curl -s http://localhost:8080/api/v1/reconciliation/pay_ghost \
+  -H "Authorization: Bearer $TOKEN" | jq .
 ```
 
 **Respuesta esperada:**
@@ -173,9 +132,7 @@ curl -s -X GET "http://localhost:8080/api/v1/reconciliation/pay_ghost" \
 {
   "httpStatus": 404,
   "errorCode": "PAYMENT_NOT_FOUND",
-  "message": "Payment not found in any source: pay_ghost",
-  "fieldErrors": null,
-  "timestamp": "2024-06-15T10:05:03"
+  "message": "Payment not found in any source: pay_ghost"
 }
 ```
 
@@ -185,29 +142,51 @@ curl -s -X GET "http://localhost:8080/api/v1/reconciliation/pay_ghost" \
 
 ```bash
 # Todos los tests
-./mvnw test
+./gradlew test
 
-# Solo tests unitarios del dominio
-./mvnw test -Dtest=ReconciliationServiceTest
+# Solo tests del servicio de dominio
+./gradlew test --tests "*.ReconciliationServiceTest"
 
 # Solo tests del controlador
-./mvnw test -Dtest=ReconciliationControllerTest
+./gradlew test --tests "*.ReconciliationControllerTest"
 
 # Tests del value object Money
-./mvnw test -Dtest=MoneyTest
-
-# Reporte de cobertura con JaCoCo (si se agrega el plugin)
-./mvnw verify
+./gradlew test --tests "*.MoneyTest"
 ```
 
 ---
 
-## 6. Verificar Circuit Breaker (Actuator)
+## 6. Compilar sin tests
 
 ```bash
-# Estado del Circuit Breaker del procesador externo
+./gradlew build -x test
+```
+
+---
+
+## 7. Verificar Circuit Breaker (Actuator)
+
+```bash
+# Estado del Circuit Breaker
 curl -s http://localhost:8080/api/actuator/circuitbreakers | jq .
 
 # Métricas de la aplicación
 curl -s http://localhost:8080/api/actuator/metrics | jq .names
+```
+
+---
+
+## Docker — estructura de servicios
+
+```
+docker-compose.yml
+  ├── postgres (postgres:16-alpine)
+  │     └── healthcheck: pg_isready cada 10s
+  ├── wiremock-json (wiremock/wiremock:3.6.0-alpine) — puerto 9091
+  │     └── monta docker/wiremock/json/mappings/ — stubs REST
+  ├── wiremock-soap (wiremock/wiremock:3.6.0-alpine) — puerto 9092
+  │     └── monta docker/wiremock/soap/mappings/ — stubs SOAP/XML
+  └── app (imagen multi-stage desde Dockerfile)
+        ├── depends_on: postgres (condition: service_healthy)
+        └── SPRING_PROFILES_ACTIVE=docker
 ```
