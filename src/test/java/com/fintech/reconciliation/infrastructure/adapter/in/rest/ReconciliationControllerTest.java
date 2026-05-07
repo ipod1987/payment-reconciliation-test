@@ -10,12 +10,17 @@ import com.fintech.reconciliation.domain.model.valueobject.Money;
 import com.fintech.reconciliation.domain.model.valueobject.PaymentId;
 import com.fintech.reconciliation.domain.model.valueobject.ReconciliationStatus;
 import com.fintech.reconciliation.infrastructure.adapter.in.rest.mapper.ReconciliationResponseMapperImpl;
+import com.fintech.reconciliation.infrastructure.config.SecurityConfig;
+import com.fintech.reconciliation.infrastructure.security.JwtAuthenticationFilter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,7 +35,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(
     value = ReconciliationController.class,
-    excludeAutoConfiguration = SecurityAutoConfiguration.class
+    excludeAutoConfiguration = {SecurityAutoConfiguration.class, SecurityFilterAutoConfiguration.class},
+    excludeFilters = @ComponentScan.Filter(
+        type = FilterType.ASSIGNABLE_TYPE,
+        classes = {SecurityConfig.class, JwtAuthenticationFilter.class}
+    )
 )
 @Import({ReconciliationResponseMapperImpl.class, GlobalExceptionHandler.class})
 @DisplayName("ReconciliationController")

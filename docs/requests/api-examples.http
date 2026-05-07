@@ -1,0 +1,222 @@
+# Payment Reconciliation API — HTTP Client examples
+# Compatible with: VS Code REST Client extension · IntelliJ HTTP Client
+#
+# Usage:
+#   1. docker compose up -d && make seed
+#   2. Run "Obtain token" first — the @token variable is set automatically
+#   3. Run any reconciliation request below
+
+@baseUrl = http://localhost:8080/api
+
+# =============================================================================
+# AUTH
+# =============================================================================
+
+### Obtain JWT token (admin)
+# @name auth
+POST {{baseUrl}}/v1/auth/token
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+# Save token from the response above — copy the value of access_token
+# and replace <PASTE_TOKEN_HERE> in the @token variable below, or run
+# via IntelliJ which auto-binds @auth.response.body.access_token
+@token = {{auth.response.body.access_token}}
+
+### Wrong credentials → 401
+POST {{baseUrl}}/v1/auth/token
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "wrong-password"
+}
+
+# =============================================================================
+# CONCILIATED — all three sources match (amount ±0.01, date ±5 min)
+# =============================================================================
+
+### pay_abc123 — Nike Store, USD 100.00
+GET {{baseUrl}}/v1/reconciliation/pay_abc123
+Authorization: Bearer {{token}}
+
+###
+
+### pay_c001 — Starbucks, USD 50.00
+GET {{baseUrl}}/v1/reconciliation/pay_c001
+Authorization: Bearer {{token}}
+
+###
+
+### pay_c002 — Amazon, EUR 199.99
+GET {{baseUrl}}/v1/reconciliation/pay_c002
+Authorization: Bearer {{token}}
+
+###
+
+### pay_c003 — Delta Airlines, USD 1500.00
+GET {{baseUrl}}/v1/reconciliation/pay_c003
+Authorization: Bearer {{token}}
+
+###
+
+### pay_c004 — The Fat Duck, GBP 85.00
+GET {{baseUrl}}/v1/reconciliation/pay_c004
+Authorization: Bearer {{token}}
+
+###
+
+### pay_c005 — Netflix subscription, USD 29.99
+GET {{baseUrl}}/v1/reconciliation/pay_c005
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# DISCREPANCY_AMOUNT — amount differs > 0.01 between internal and a processor
+# =============================================================================
+
+### pay_disc001 — Spotify: internal 100.00 / processors 95.00
+# Expected: status=DISCREPANCY_AMOUNT, discrepancies[0].type=AMOUNT_MISMATCH
+GET {{baseUrl}}/v1/reconciliation/pay_disc001
+Authorization: Bearer {{token}}
+
+###
+
+### pay_d001 — Sysco Foods: internal 500.00 / processor 499.50
+GET {{baseUrl}}/v1/reconciliation/pay_d001
+Authorization: Bearer {{token}}
+
+###
+
+### pay_d002 — Apple Store: internal 1200.00 / processor 1050.00
+GET {{baseUrl}}/v1/reconciliation/pay_d002
+Authorization: Bearer {{token}}
+
+###
+
+### pay_d003 — Dr. Martinez EUR: internal 75.00 / processor 82.50
+GET {{baseUrl}}/v1/reconciliation/pay_d003
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# DISCREPANCY_DATE — transaction date differs > 5 minutes
+# =============================================================================
+
+### pay_date001 — Marriott: internal 09:00 / processor 11:00 (+2h)
+# Expected: status=DISCREPANCY_DATE, discrepancies[0].type=DATE_MISMATCH
+GET {{baseUrl}}/v1/reconciliation/pay_date001
+Authorization: Bearer {{token}}
+
+###
+
+### pay_dt001 — Hertz car rental: processor +30 min
+GET {{baseUrl}}/v1/reconciliation/pay_dt001
+Authorization: Bearer {{token}}
+
+###
+
+### pay_dt002 — Accenture consulting: processor +1 day
+GET {{baseUrl}}/v1/reconciliation/pay_dt002
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# MULTIPLE_DISCREPANCIES — both amount AND date differ
+# =============================================================================
+
+### pay_multi001 — Salesforce: internal 300.00 11:00 / processor 285.00 12:30
+# Expected: status=MULTIPLE_DISCREPANCIES, discrepancies has AMOUNT_MISMATCH + DATE_MISMATCH
+GET {{baseUrl}}/v1/reconciliation/pay_multi001
+Authorization: Bearer {{token}}
+
+###
+
+### pay_multi002 — DHL Express EUR: internal 150.00 09:00 / processor 160.00 09:00
+GET {{baseUrl}}/v1/reconciliation/pay_multi002
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# MISSING_IN_PROCESSOR — payment exists internally, absent in both processors
+# =============================================================================
+
+### pay_missing — Wire transfer: internal has it, both processors return 404/fault
+# Expected: status=MISSING_IN_PROCESSOR, processorPayment=null, soapProcessorPayment=null
+GET {{baseUrl}}/v1/reconciliation/pay_missing
+Authorization: Bearer {{token}}
+
+###
+
+### pay_mp001 — Shopify marketplace payout
+GET {{baseUrl}}/v1/reconciliation/pay_mp001
+Authorization: Bearer {{token}}
+
+###
+
+### pay_mp002 — Upwork freelance payment
+GET {{baseUrl}}/v1/reconciliation/pay_mp002
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# MISSING_IN_INTERNAL — payment exists in processors, absent in internal DB
+# =============================================================================
+
+### pay_extonly — Amazon refund: both processors have it, internal DB does not
+# Expected: status=MISSING_IN_INTERNAL, internalPayment=null
+GET {{baseUrl}}/v1/reconciliation/pay_extonly
+Authorization: Bearer {{token}}
+
+###
+
+### pay_ext001 — Visa chargeback reversal
+GET {{baseUrl}}/v1/reconciliation/pay_ext001
+Authorization: Bearer {{token}}
+
+###
+
+### pay_ext002 — PayPal adjustment EUR
+GET {{baseUrl}}/v1/reconciliation/pay_ext002
+Authorization: Bearer {{token}}
+
+# =============================================================================
+# ERROR CASES
+# =============================================================================
+
+### Unknown payment — absent in all three sources → 404
+# Expected: HTTP 404, body.errorCode=PAYMENT_NOT_FOUND
+GET {{baseUrl}}/v1/reconciliation/pay_ghost
+Authorization: Bearer {{token}}
+
+###
+
+### No Authorization header → 401
+GET {{baseUrl}}/v1/reconciliation/pay_abc123
+
+###
+
+### Invalid / expired token → 401
+GET {{baseUrl}}/v1/reconciliation/pay_abc123
+Authorization: Bearer invalid.jwt.token
+
+# =============================================================================
+# ACTUATOR & OBSERVABILITY
+# =============================================================================
+
+### Application health (no auth required)
+GET {{baseUrl}}/actuator/health
+
+###
+
+### Circuit breaker state — paymentProcessor + soapProcessor
+GET {{baseUrl}}/actuator/circuitbreakers
+
+###
+
+### All available metrics
+GET {{baseUrl}}/actuator/metrics
+
+###
+
+### Specific metric — JVM memory used
+GET {{baseUrl}}/actuator/metrics/jvm.memory.used

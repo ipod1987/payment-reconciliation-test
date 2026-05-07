@@ -19,7 +19,7 @@ public interface ReconciliationResponseMapper {
     @Mapping(target = "status",               expression = "java(result.getStatus().name())")
     @Mapping(target = "statusDescription",    expression = "java(result.getStatus().getDescription())")
     @Mapping(target = "fullyReconciled",      expression = "java(result.getStatus().isFullyReconciled())")
-    @Mapping(target = "discrepancies",        source = "discrepancies")
+    @Mapping(target = "discrepancies",        expression = "java(toDiscrepancyDetailDtoList(result.getDiscrepancies()))")
     @Mapping(target = "internalPayment",      expression = "java(result.getInternalPayment().map(p -> toPaymentSummaryDto(p)).orElse(null))")
     @Mapping(target = "processorPayment",     expression = "java(result.getProcessorPayment().map(p -> toPaymentSummaryDto(p)).orElse(null))")
     @Mapping(target = "soapProcessorPayment", expression = "java(result.getSoapProcessorPayment().map(p -> toPaymentSummaryDto(p)).orElse(null))")

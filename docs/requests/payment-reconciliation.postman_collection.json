@@ -1,0 +1,476 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Payment Reconciliation API",
+    "description": "3-way payment reconciliation between Internal DB, JSON Processor (REST) and SOAP Processor (XML).\n\nThe collection auto-fetches a JWT on every request via a pre-request script stored at the collection level — no manual token copy-paste needed.\n\nPre-requisite: run `docker compose up -d && make seed` before using this collection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",  "value": "http://localhost:8080/api", "type": "string" },
+    { "key": "username", "value": "admin",                     "type": "string" },
+    { "key": "password", "value": "admin123",                  "type": "string" },
+    { "key": "token",    "value": "",                          "type": "string" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const baseUrl  = pm.collectionVariables.get('baseUrl');",
+          "const username = pm.collectionVariables.get('username');",
+          "const password = pm.collectionVariables.get('password');",
+          "",
+          "pm.sendRequest({",
+          "    url: baseUrl + '/v1/auth/token',",
+          "    method: 'POST',",
+          "    header: { 'Content-Type': 'application/json' },",
+          "    body: { mode: 'raw', raw: JSON.stringify({ username, password }) }",
+          "}, (err, res) => {",
+          "    if (!err && res.code === 200) {",
+          "        pm.collectionVariables.set('token', res.json().access_token);",
+          "    }",
+          "});"
+        ]
+      }
+    }
+  ],
+  "item": [
+
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /auth/token — valid credentials",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has access_token', () => pm.expect(pm.response.json().access_token).to.be.a('string'));",
+                  "pm.collectionVariables.set('token', pm.response.json().access_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/auth/token", "host": ["{{baseUrl}}"], "path": ["v1","auth","token"] }
+          }
+        },
+        {
+          "name": "POST /auth/token — wrong password → 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"wrong-password\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/auth/token", "host": ["{{baseUrl}}"], "path": ["v1","auth","token"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Reconciliation — CONCILIATED",
+      "item": [
+        {
+          "name": "pay_abc123 — all three sources match",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('CONCILIATED', () => pm.expect(r.status).to.eql('CONCILIATED'));",
+                  "pm.test('fullyReconciled true', () => pm.expect(r.fullyReconciled).to.be.true);",
+                  "pm.test('No discrepancies', () => pm.expect(r.discrepancies).to.have.lengthOf(0));",
+                  "pm.test('Has internalPayment', () => pm.expect(r.internalPayment).to.not.be.undefined);",
+                  "pm.test('Has processorPayment', () => pm.expect(r.processorPayment).to.not.be.undefined);",
+                  "pm.test('Has soapProcessorPayment', () => pm.expect(r.soapProcessorPayment).to.not.be.undefined);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_abc123", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_abc123"] }
+          }
+        },
+        {
+          "name": "pay_c001 — coffee shop, USD 50.00",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_c001", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_c001"] }
+          }
+        },
+        {
+          "name": "pay_c002 — Amazon EUR 199.99",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_c002", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_c002"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Reconciliation — DISCREPANCY_AMOUNT",
+      "item": [
+        {
+          "name": "pay_disc001 — internal 100.00 / processors 95.00",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('DISCREPANCY_AMOUNT', () => pm.expect(r.status).to.eql('DISCREPANCY_AMOUNT'));",
+                  "pm.test('fullyReconciled false', () => pm.expect(r.fullyReconciled).to.be.false);",
+                  "pm.test('Has discrepancies', () => pm.expect(r.discrepancies.length).to.be.greaterThan(0));",
+                  "pm.test('Discrepancy type AMOUNT_MISMATCH', () => pm.expect(r.discrepancies[0].type).to.eql('AMOUNT_MISMATCH'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_disc001", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_disc001"] }
+          }
+        },
+        {
+          "name": "pay_d001 — Sysco Foods, internal 500.00 / processor 499.50",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_d001", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_d001"] }
+          }
+        },
+        {
+          "name": "pay_d002 — Apple Store, internal 1200.00 / processor 1050.00",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_d002", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_d002"] }
+          }
+        },
+        {
+          "name": "pay_d003 — Dr. Martinez EUR, internal 75.00 / processor 82.50",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_d003", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_d003"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Reconciliation — DISCREPANCY_DATE",
+      "item": [
+        {
+          "name": "pay_date001 — Marriott hotel, processor +2h",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('DISCREPANCY_DATE', () => pm.expect(r.status).to.eql('DISCREPANCY_DATE'));",
+                  "pm.test('Discrepancy type DATE_MISMATCH', () => pm.expect(r.discrepancies[0].type).to.eql('DATE_MISMATCH'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_date001", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_date001"] }
+          }
+        },
+        {
+          "name": "pay_dt001 — Hertz car rental, processor +30 min",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_dt001", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_dt001"] }
+          }
+        },
+        {
+          "name": "pay_dt002 — Accenture, processor +1 day",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_dt002", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_dt002"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Reconciliation — MULTIPLE_DISCREPANCIES",
+      "item": [
+        {
+          "name": "pay_multi001 — Salesforce, amount + date mismatch",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('MULTIPLE_DISCREPANCIES', () => pm.expect(r.status).to.eql('MULTIPLE_DISCREPANCIES'));",
+                  "pm.test('At least 2 discrepancies', () => pm.expect(r.discrepancies.length).to.be.at.least(2));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_multi001", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_multi001"] }
+          }
+        },
+        {
+          "name": "pay_multi002 — DHL Express EUR, amount + date mismatch",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_multi002", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_multi002"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Reconciliation — MISSING IN PROCESSOR",
+      "item": [
+        {
+          "name": "pay_missing — exists internally, absent in both processors",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('MISSING_IN_PROCESSOR', () => pm.expect(r.status).to.eql('MISSING_IN_PROCESSOR'));",
+                  "pm.test('Has internalPayment', () => pm.expect(r.internalPayment).to.not.be.undefined);",
+                  "pm.test('processorPayment absent', () => pm.expect(r.processorPayment).to.be.undefined);",
+                  "pm.test('soapProcessorPayment absent', () => pm.expect(r.soapProcessorPayment).to.be.undefined);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_missing", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_missing"] }
+          }
+        },
+        {
+          "name": "pay_mp001 — Shopify payout, absent in both processors",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_mp001", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_mp001"] }
+          }
+        },
+        {
+          "name": "pay_mp002 — Upwork freelance, absent in both processors",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_mp002", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_mp002"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Reconciliation — MISSING IN INTERNAL",
+      "item": [
+        {
+          "name": "pay_extonly — exists in processors, absent in internal DB",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('MISSING_IN_INTERNAL', () => pm.expect(r.status).to.eql('MISSING_IN_INTERNAL'));",
+                  "pm.test('internalPayment absent', () => pm.expect(r.internalPayment).to.be.undefined);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_extonly", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_extonly"] }
+          }
+        },
+        {
+          "name": "pay_ext001 — Visa chargeback, absent in internal DB",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_ext001", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_ext001"] }
+          }
+        },
+        {
+          "name": "pay_ext002 — PayPal adjustment, absent in internal DB",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_ext002", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_ext002"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Reconciliation — Error Cases",
+      "item": [
+        {
+          "name": "pay_ghost — not found in any source → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('PAYMENT_NOT_FOUND error code', () => pm.expect(pm.response.json().errorCode).to.eql('PAYMENT_NOT_FOUND'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_ghost", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_ghost"] }
+          }
+        },
+        {
+          "name": "No token → 401",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": [""], "type": "text/javascript" }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_abc123", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_abc123"] }
+          }
+        },
+        {
+          "name": "Expired / invalid token → 401",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": [""], "type": "text/javascript" }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer invalid.token.here" }],
+            "url": { "raw": "{{baseUrl}}/v1/reconciliation/pay_abc123", "host": ["{{baseUrl}}"], "path": ["v1","reconciliation","pay_abc123"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Actuator & Observability",
+      "item": [
+        {
+          "name": "GET /actuator/health",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "exec": [""], "type": "text/javascript" }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator","health"] }
+          }
+        },
+        {
+          "name": "GET /actuator/circuitbreakers — state of both CBs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/actuator/circuitbreakers", "host": ["{{baseUrl}}"], "path": ["actuator","circuitbreakers"] }
+          }
+        },
+        {
+          "name": "GET /actuator/metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/actuator/metrics", "host": ["{{baseUrl}}"], "path": ["actuator","metrics"] }
+          }
+        }
+      ]
+    }
+
+  ]
+}
